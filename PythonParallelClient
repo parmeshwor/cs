@@ -1,0 +1,168 @@
+import concurrent.futures
+import os
+from tika import parser
+import time
+
+
+"""
+10 threads * 100 documents a time; => 1000 documents in a cycle
+
+java -Dlog4j.configuration=file:log4j_server.xml -jar 1-tika-server-1.22.jar -spawnChild -JXmx4g -JDlog4j.configuration=file:log4j_child.xml}} --host=intranet.local --port=8081
+
+
+
+java -jar tika-server-x.x.jar --host=intranet.local --port=12345
+
+java -Dlog4j.configuration=file:log4j_server.xml -jar 1-tika-server-1.22.jar -spawnChild -JXmx4g -JDlog4j.configuration=file:log4j_child.xml --host=intranet.local --port=8081
+
+
+
+pthapa@pthapa-ThinkPad-T460p:~/solr_all$ cat log4j_child.xml 
+<xml>
+<appender name="console" class="org.apache.log4j.ConsoleAppender"> 
+ <param name="target" value="System.err"/> 
+ <layout class="org.apache.log4j.PatternLayout"> 
+ <param name="ConversionPattern" 
+ value="%d\{yyyy-MM-dd HH:mm:ss} %-5p %c\{1}:%L - %m%n" /> 
+ </layout> 
+ </appender> 
+ </xml>
+pthapa@pthapa-ThinkPad-T460p:~/solr_all$ ^C
+pthapa@pthapa-ThinkPad-T460p:~/solr_all$ ^C
+pthapa@pthapa-ThinkPad-T460p:~/solr_all$ ^C
+pthapa@pthapa-ThinkPad-T460p:~/solr_all$ java -jar tika-server-1.22.jar -spawnChild -JXmx4g -JDlog4j.configuration=file:log4j_child.xml  --port=8081
+
+"""
+
+
+def os_path_generator():
+    def os_path():
+
+        count = 0
+        li = list()
+        path = '/home/pthapa'
+        for root, dirs, files in os.walk(path):
+            for name in files:
+                li.append(os.path.join(root, name))
+                count += 1
+                if count == 100:
+                    yield li
+                    li = list()
+                    count = 0
+        yield li
+
+    for i in os_path():
+        print(i)
+
+
+
+def parse_file(li,count):
+    # call to tika
+    # print(li)
+    print('---------count--', count)
+    for f in li:
+        try:
+            parsed = parser.from_file(f, 'http://localhost:8081')
+            # print(parsed['metadata'])
+            # print(parsed['status'])
+        except Exception as exc:
+            # time.sleep(20)
+            exc = str(exc)
+            print('----',exc, type(exc))
+
+
+
+
+def os_path():
+    count = 0
+    li = list()
+    path = '/home/pthapa/Downloads'
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            li.append(os.path.join(root, name))
+            count += 1
+            if count == 10:
+                yield li
+                li = list()
+                count = 0
+    yield li
+
+def main():
+    count = 0
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
+        for k in os_path():
+            count = count+1
+            executor.submit(parse_file, k, count)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def path_finder():
+
+    def gen_path():
+        count = 0
+        li = []
+        for i in range(33):
+            count += 1
+
+            li.append(i)
+
+            if count % 10 == 0:
+                yield li
+                li = list()
+        yield li
+
+    for i in gen_path():
+        print(i)
+
+def test_from_internet():
+    import concurrent.futures
+    import urllib.request
+
+    URLS = ['http://www.foxnews.com/',
+            'http://www.cnn.com/',
+            'http://europe.wsj.com/',
+            'http://www.bbc.co.uk/',
+            'http://some-made-up-domain.com/',
+            'http://www.cnn.com/',
+            'http://europe.wsj.com/',
+            'http://www.bbc.co.uk/',
+            'http://some-made-up-domain.com/'
+
+            ]
+
+    # Retrieve a single page and report the URL and contents
+    def load_url(url, timeout):
+        with urllib.request.urlopen(url, timeout=timeout) as conn:
+            return conn.read()
+
+    # We can use a with statement to ensure threads are cleaned up promptly
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # Start the load operations and mark each future with its URL
+        future_to_url = {executor.submit(load_url, url, 60): url for url in URLS}
+        for future in concurrent.futures.as_completed(future_to_url):
+            url = future_to_url[future]
+            try:
+                data = future.result()
+            except Exception as exc:
+                print('%r generated an exception: %s' % (url, exc))
+            else:
+                print('%r page is %d bytes' % (url, len(data)))
+
+#test_from_internet()
+# path_finder()
+main()
+
+
